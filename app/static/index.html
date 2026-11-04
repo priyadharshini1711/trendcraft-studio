@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrendCraft</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23E5482D'/%3E%3Cpath d='M9 10h14v3.5h-5V24h-4V13.5H9z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: { paper: '#FAF6EF', ink: '#1E1A16', flame: { DEFAULT: '#E5482D', dark: '#C23519', soft: '#FDE9E3' } },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { background: #FAF6EF; }
+    button:focus-visible, input:focus-visible, a:focus-visible, label:focus-within { outline: 2px solid #E5482D; outline-offset: 2px; }
+    .prewrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @keyframes ticker { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+    @keyframes scan { 0%, 100% { top: 8%; } 50% { top: 84%; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @keyframes bounce3 { 0%, 80%, 100% { transform: translateY(0); opacity: .4; } 40% { transform: translateY(-5px); opacity: 1; } }
+    .ticker { animation: ticker 28s linear infinite; }
+    .scanline { position: absolute; left: 0; right: 0; height: 56px; animation: scan 5s ease-in-out infinite; background: linear-gradient(transparent, rgba(229,72,45,.22), transparent); border-top: 1px solid rgba(229,72,45,.5); border-bottom: 1px solid rgba(229,72,45,.5); }
+    .piece { opacity: 0; animation: rise .6s ease forwards; }
+    .shine { background: linear-gradient(90deg, #e7e2da 25%, #f6f2ec 50%, #e7e2da 75%); background-size: 200% 100%; animation: shimmer 1.8s linear infinite; }
+    .piece.shine { animation: rise .6s ease forwards, shimmer 1.8s linear infinite; }
+    .dot { display: inline-block; height: 7px; width: 7px; border-radius: 99px; background: currentColor; animation: bounce3 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: .15s; } .dot:nth-child(3) { animation-delay: .3s; }
+    .phone { aspect-ratio: 9 / 16; border-radius: 28px; border: 7px solid #1E1A16; overflow: hidden; background: #fff; }
+    @media (prefers-reduced-motion: reduce) { .ticker, .scanline, .shine, .dot { animation: none; } .piece, .piece.shine { animation: none; opacity: 1; } }
+  </style>
+</head>
+<body class="font-sans text-ink antialiased min-h-screen">
+  <header class="max-w-5xl mx-auto px-4 pt-5 pb-3 flex items-center justify-between gap-3">
+    <button id="logo" class="font-display font-extrabold text-xl tracking-tight">Trend<span class="text-flame">Craft</span></button>
+    <div class="flex items-center gap-2 sm:gap-4">
+      <nav aria-label="Progress" id="stepper" class="flex items-center gap-1 text-xs sm:text-sm font-medium"></nav>
+      <div class="flex rounded-xl bg-stone-200/70 p-1 text-sm font-semibold" id="tabs"></div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 pb-20">
+    <div id="banner"></div>
+    <section id="view" aria-live="polite"></section>
+  </main>
+
+  <div id="toasts" class="fixed top-4 inset-x-4 sm:left-auto sm:right-4 sm:w-96 space-y-2 z-[60]"></div>
+
+  <button id="chat-toggle" aria-label="Ask your content" class="fixed bottom-4 right-4 z-40 rounded-full bg-flame text-white font-semibold px-5 py-3.5 shadow-xl hover:bg-flame-dark transition">Ask my content</button>
+  <aside id="chat-panel" aria-label="Content assistant" class="hidden fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[620px] sm:max-h-[85vh] sm:w-[400px] z-50 flex-col bg-white sm:rounded-2xl shadow-2xl border border-stone-200">
+    <div class="flex items-center justify-between gap-3 border-b border-stone-200 p-4">
+      <div>
+        <h2 class="font-display font-bold text-lg leading-tight">Ask my content</h2>
+        <p class="text-xs text-stone-500">Answers come only from your saved library.</p>
+      </div>
+      <button id="chat-close" aria-label="Close" class="rounded-lg border border-stone-300 px-2.5 py-1 text-sm font-semibold hover:border-ink">Close</button>
+    </div>
+    <div id="chat-messages" aria-live="polite" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+    <form id="chat-form" class="flex items-center gap-2 border-t border-stone-200 p-3">
+      <button type="button" id="chat-mic" aria-label="Ask by voice" class="shrink-0 rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-semibold hover:border-ink">Voice</button>
+      <input id="chat-input" maxlength="2000" autocomplete="off" placeholder="Ask about your posts..." aria-label="Your question" class="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-ink">
+      <button class="shrink-0 rounded-xl bg-ink text-white px-3.5 py-2.5 text-sm font-semibold hover:bg-flame transition">Send</button>
+    </form>
+  </aside>
+
+<script>
+const FORMATS = [
+  { id: 'reel', label: 'Reel' },
+  { id: 'carousel', label: 'Carousel' },
+  { id: 'single', label: 'Single post' },
+  { id: 'thread', label: 'Thread' },
+];
+const CAPTION_TABS = [
+  { id: 'informative', label: 'Informative' },
+  { id: 'witty', label: 'Witty' },
+  { id: 'hot_take', label: 'Hot take' },
+];
+const CONTENT_TITLES = { reel: 'Reel script', carousel: 'Carousel slides', single: 'Post copy', thread: 'Thread' };
+
+const ANGLE_MESSAGES = ["Reading the latest headlines...", 'Grouping stories into angles...', 'Scoring what creators can use...', 'Almost there...'];
+const KIT_MESSAGES = ['Writing your hooks and captions...', 'Drafting the rest of your kit...', 'Checking claims against the sources...', 'Almost there...'];
+
+const STATUSES = [{ id: 'new', label: 'New' }, { id: 'posted', label: 'Posted' }, { id: 'archived', label: 'Archived' }];
+const STATUS_STYLE = { new: 'bg-amber-200 text-ink', posted: 'bg-emerald-200 text-emerald-950', archived: 'bg-stone-300 text-stone-700' };
+const CHAT_SUGGESTIONS = ["What haven't I posted yet?", 'Which of my hooks is strongest?', 'Do any posts have fact-check warnings?'];
+const TIPS = [
+  'A hook only has one job: earn the next three seconds.',
+  'Pin a comment with your source. It builds trust and starts a conversation.',
+  'Say one idea per slide. If it needs a comma, it may need two slides.',
+  'End on a question your audience can answer in one word.',
+  'Keep on-screen text inside the middle of the frame, clear of platform buttons.',
+  'Record the voiceover before you pick the music, not after.',
+];
+
+const state = {
+  view: 'create', fromLibrary: false,
+  library: { items: [], filter: 'all', q: '', loading: false, failed: false },
+  chat: { open: false, busy: false, recording: false, messages: [] },
+  step: 1, niches: [], nichesFailed: false, health: null, niche: null, custom: '',
+  angles: [], origin: null, nicheLabel: '', articleCount: 0,
+  format: 'reel', style: null, angle: null, kit: null, captionTab: 'informative', cover: null,
+  kitStyled: false, styleLoading: false, styleThumbs: [], styleRun: 0,
+  loading: null, error: null, run: 0,
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : '#');
+
+async function api(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, { signal: AbortSignal.timeout(400000), ...options });
+  } catch (err) {
+    throw new Error(err.name === 'TimeoutError' ? 'That took too long. Please try again.' : "Can't reach the server. Is it running?");
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof data.detail === 'string' ? data.detail : 'Something went wrong. Please try again.');
+  }
+  return data;
+}
+const postJson = (path, body) => api(path, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+});
+
+function toast(message, kind = 'error') {
+  const el = document.createElement('div');
+  el.setAttribute('role', 'status');
+  el.className = `rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${kind === 'error' ? 'bg-ink text-white border-l-4 border-flame' : 'bg-emerald-700 text-white'}`;
+  el.textContent = message;
+  $('toasts').append(el);
+  setTimeout(() => el.remove(), kind === 'error' ? 6000 : 1800);
+}
+
+const copyBtn = (text, label = 'Copy') =>
+  `<button data-copy="${esc(text)}" aria-label="${esc(label)}" class="shrink-0 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold hover:border-ink">${esc(label)}</button>`;
+
+function renderTabs() {
+  $('tabs').innerHTML = [['create', 'Create'], ['library', 'Library']].map(([id, label]) =>
+    `<button data-view="${id}" ${state.view === id ? 'aria-current="page"' : ''} class="rounded-lg px-2.5 sm:px-3 py-1 ${state.view === id ? 'bg-white shadow-sm' : 'text-stone-600'}">${label}</button>`).join('');
+}
+
+function renderStepper() {
+  const steps = ['Niche', 'Angle', 'Post kit'];
+  if (state.view !== 'create' || state.fromLibrary) {
+    $('stepper').innerHTML = '';
+    return;
+  }
+  $('stepper').innerHTML = steps.map((name, i) => {
+    const n = i + 1;
+    const done = n < state.step;
+    const cls = n === state.step ? 'bg-ink text-white' : done ? 'bg-stone-200 hover:bg-stone-300' : 'text-stone-400';
+    return `<button data-go="${n}" ${done ? '' : 'disabled'} ${n === state.step ? 'aria-current="step"' : ''} class="rounded-full px-2.5 py-1 ${cls}">${n}<span class="hidden md:inline"> ${name}</span></button>`;
+  }).join('');
+}
+
+function renderBanner() {
+  const note = (text) => `<p class="mb-4 rounded-lg bg-stone-200/70 px-3 py-2 text-xs font-medium text-stone-700">${esc(text)}</p>`;
+  let html = '';
+  if (state.health && !state.health.text_ready) html += note('Setup needed: add the META_* values to .env and restart the server.');
+  if (state.view === 'create' && !state.fromLibrary && state.step > 1 && state.origin === 'fixture') html += note('Demo mode: showing invented sample stories, not real news.');
+  $('banner').innerHTML = html;
+}
+
+function skeleton(message, blocks) {
+  return `<div role="status" aria-busy="true">
+    <p id="loading-msg" class="font-display text-2xl font-bold mt-4 mb-5">${esc(message)}</p>
+    <div class="space-y-3 animate-pulse">
+      ${Array.from({ length: blocks }, () => `<div class="rounded-2xl bg-white border border-stone-200 p-5">
+        <div class="h-3 w-24 rounded bg-stone-200 mb-3"></div>
+        <div class="h-5 w-3/4 rounded bg-stone-200 mb-3"></div>
+        <div class="h-3 w-full rounded bg-stone-100"></div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderNewsroom() {
+  const { headlines } = state.loading;
+  const rows = (headlines || []).map((h) => `<li class="py-2.5 border-b border-white/10"><span class="block text-sm sm:text-base font-medium leading-snug">${esc(h.title)}</span><span class="text-xs text-white/50">${esc(h.source)}</span></li>`).join('');
+  return `<div role="status" aria-busy="true" class="mt-4 max-w-2xl mx-auto">
+    <p class="text-xs font-semibold uppercase tracking-widest text-flame-dark">The newsroom</p>
+    <p id="loading-msg" class="font-display text-3xl font-extrabold mt-1 mb-1">${esc(state.loading.messages[state.loading.tick])}</p>
+    <p class="text-sm text-stone-600 mb-4">${headlines ? `${headlines.length} ${state.loading.origin === 'fixture' ? 'invented sample' : 'real'} stories on the desk right now.` : 'Pulling the latest stories...'}</p>
+    <div class="relative h-96 overflow-hidden rounded-2xl bg-ink text-white px-5">
+      ${headlines ? `<div class="scanline"></div><ul class="ticker">${rows}${rows}</ul>` : '<div class="h-full grid place-items-center"><span class="flex gap-1.5"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>'}
+      <div class="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-ink"></div>
+      <div class="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-ink"></div>
+    </div>
+  </div>`;
+}
+
+function renderWritersRoom() {
+  const stages = ['Picking the sharpest hooks', 'Writing captions in three tones', 'Drafting your content beat by beat', 'Choosing hashtags and tips', 'Saving it to your library'];
+  const rows = stages.map((label, i) => `<li data-stage="${i}" class="flex items-center gap-2.5 text-sm ${i === 0 ? 'font-semibold text-ink' : 'text-stone-400'}"><span class="h-2 w-2 rounded-full ${i === 0 ? 'bg-flame' : 'bg-stone-300'}"></span>${label}</li>`).join('');
+  const piece = (delay, cls) => `<div class="piece shine rounded ${cls}" style="animation-delay:${delay}s"></div>`;
+  const title = state.angle ? state.angle.title : '';
+  return `<div role="status" aria-busy="true" class="mt-4 grid sm:grid-cols-[220px,1fr] gap-6 sm:gap-10 items-center max-w-3xl mx-auto">
+    <div class="phone mx-auto w-44 sm:w-full p-3 space-y-2.5" aria-hidden="true">
+      ${piece(0.2, 'h-28 rounded-xl')}${piece(3, 'h-4 w-4/5')}${piece(6, 'h-4 w-3/5')}${piece(10, 'h-3 w-full')}${piece(13, 'h-3 w-full')}${piece(16, 'h-3 w-2/3')}${piece(20, 'h-10 rounded-lg')}${piece(24, 'h-3 w-1/2')}
+    </div>
+    <div class="min-w-0">
+      <p class="text-xs font-semibold uppercase tracking-widest text-flame-dark">The writers' room</p>
+      <p class="font-display text-2xl sm:text-3xl font-extrabold leading-tight mt-1">${esc(title)}</p>
+      <p id="loading-msg" class="sr-only">${esc(state.loading.messages[0])}</p>
+      <ul class="mt-4 space-y-2">${rows}</ul>
+      <div class="mt-5 rounded-xl bg-white border border-stone-200 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-stone-500">While you wait</p>
+        <p id="loading-tip" class="mt-1 text-sm font-medium">${esc(TIPS[Math.floor(Math.random() * TIPS.length)])}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function errorBlock(message, action) {
+  return `<div class="rounded-xl border border-flame/40 bg-flame-soft px-4 py-3 mb-4 flex items-center justify-between gap-3">
+    <p class="text-sm font-medium">${esc(message)}</p>
+    <button data-action="${action}" class="shrink-0 rounded-lg bg-ink text-white px-3 py-1.5 text-xs font-semibold">Try again</button>
+  </div>`;
+}
+
+function renderNiche() {
+  const chips = state.niches.map((n) => {
+    const on = state.niche === n.id;
+    return `<button data-niche="${esc(n.id)}" aria-pressed="${on}" class="rounded-full border px-4 py-2 text-sm font-semibold transition ${on ? 'bg-flame border-flame text-white' : 'bg-white border-stone-300 hover:border-ink'}">${esc(n.label)}</button>`;
+  }).join('');
+  return `<div class="max-w-2xl mx-auto pt-8 sm:pt-14">
+    <h1 class="font-display font-extrabold text-4xl sm:text-6xl leading-[1.02] tracking-tight">Today's news,<br>ready to post.</h1>
+    <p class="mt-4 text-stone-600 text-lg">Pick your niche. Get the angles worth posting about and a full post kit, with sources.</p>
+    ${state.error ? `<div class="mt-6">${errorBlock(state.error, 'find')}</div>` : ''}
+    ${state.nichesFailed ? `<div class="mt-6">${errorBlock("Couldn't load the niches.", 'load-niches')}</div>` : ''}
+    <div class="mt-8 flex flex-wrap gap-2">${chips || (state.nichesFailed ? '' : '<div class="h-10 w-full rounded-full bg-stone-200 animate-pulse"></div>')}</div>
+    <label for="custom" class="block mt-5 text-sm font-medium text-stone-600">Or type your own topic</label>
+    <input id="custom" maxlength="100" value="${esc(state.custom)}" placeholder="e.g. electric scooters, K-pop, home loans" class="mt-1.5 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-ink">
+    <button data-action="find" class="mt-5 w-full sm:w-auto rounded-xl bg-ink text-white font-semibold px-6 py-3.5 hover:bg-flame transition">Find what's trending</button>
+  </div>`;
+}
+
+function scoreClass(score) {
+  if (score >= 75) return 'bg-flame text-white';
+  if (score >= 50) return 'bg-amber-300 text-ink';
+  return 'bg-stone-200 text-ink';
+}
+
+function renderStyle() {
+  const thumbs = state.styleThumbs.map((url) => `<img src="${esc(url)}" alt="Uploaded post" class="h-16 w-16 rounded-lg object-cover border border-stone-200">`).join('');
+  if (state.styleLoading) {
+    return `<div class="flex items-center gap-3" role="status">${thumbs}<p class="text-sm font-medium animate-pulse">Reading your style...</p></div>`;
+  }
+  if (state.style) {
+    const s = state.style;
+    const swatches = s.palette.map((c) => `<span class="h-5 w-5 rounded-full border border-stone-300" style="background:${esc(c)}" title="${esc(c)}"></span>`).join('');
+    return `<div class="flex flex-wrap items-start gap-3">
+      <div class="flex gap-2">${thumbs}</div>
+      <div class="min-w-0 flex-1 basis-56">
+        <p class="text-sm font-semibold">Style matched: ${esc(s.tone)}</p>
+        <p class="text-xs text-stone-600 mt-0.5">${esc(s.caption_length)} captions · ${esc(s.emoji_use)} emoji · ${esc(s.layout)}</p>
+        <div class="flex gap-1 mt-2">${swatches}</div>
+      </div>
+      <button data-action="clear-style" class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold hover:border-ink">Remove</button>
+    </div>`;
+  }
+  return `<label class="flex items-center justify-between gap-3 cursor-pointer rounded-lg">
+    <span>
+      <span class="block text-sm font-semibold">Match my style <span class="font-normal text-stone-500">(optional)</span></span>
+      <span class="block text-xs text-stone-600 mt-0.5">Upload 1 to 3 screenshots of posts you like. PNG, JPEG or WebP, up to 5 MB each.</span>
+    </span>
+    <span class="shrink-0 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold hover:border-ink">Upload</span>
+    <input id="style-input" type="file" accept="image/png,image/jpeg,image/webp" multiple class="sr-only">
+  </label>`;
+}
+
+function renderAngles() {
+  const formats = FORMATS.map((f) => {
+    const on = state.format === f.id;
+    return `<button data-format="${f.id}" aria-pressed="${on}" class="flex-1 sm:flex-none rounded-lg px-3 py-2 text-sm font-semibold ${on ? 'bg-ink text-white' : 'hover:bg-stone-200'}">${f.label}</button>`;
+  }).join('');
+  const cards = state.angles.map((a, i) => {
+    const count = a.articles.length;
+    return `<article class="rounded-2xl bg-white border border-stone-200 p-5 flex gap-4 hover:border-ink transition">
+      <div class="shrink-0 h-14 w-14 rounded-2xl grid place-items-center ${scoreClass(a.score)}" title="Creator potential score out of 100">
+        <span class="font-display font-extrabold text-xl">${esc(a.score)}</span>
+      </div>
+      <div class="min-w-0 flex-1">
+        <span class="text-xs font-semibold uppercase tracking-wide text-flame-dark">${esc(a.emotion)}</span>
+        <h2 class="font-display font-bold text-xl leading-snug mt-0.5">${esc(a.title)}</h2>
+        <p class="text-stone-600 text-sm mt-1.5">${esc(a.why_now)}</p>
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <span class="text-xs text-stone-500">${count} source${count === 1 ? '' : 's'}</span>
+          <button data-angle="${i}" class="rounded-lg bg-ink text-white px-3.5 py-2 text-sm font-semibold hover:bg-flame transition">Build kit</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+  return `<h1 class="font-display font-extrabold text-3xl sm:text-4xl tracking-tight mt-2">What's trending in ${esc(state.nicheLabel)}</h1>
+    <p class="text-stone-600 mt-1 text-sm">${esc(state.articleCount)} stories, ${state.angles.length} angles, best first.</p>
+    ${state.error ? `<div class="mt-4">${errorBlock(state.error, 'retry-kit')}</div>` : ''}
+    <div class="mt-5">
+      <p class="text-sm font-semibold mb-1.5">Format</p>
+      <div class="inline-flex w-full sm:w-auto gap-1 rounded-xl bg-white border border-stone-200 p-1">${formats}</div>
+    </div>
+    <div class="mt-3 rounded-xl border border-dashed border-stone-400 p-4">${renderStyle()}</div>
+    <div class="mt-5 space-y-3">${cards}</div>`;
+}
+
+function card(title, body, action = '') {
+  return `<section class="rounded-2xl bg-white border border-stone-200 p-5">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h2 class="font-display font-bold text-lg">${esc(title)}</h2>${action}
+    </div>
+    ${body}
+  </section>`;
+}
+
+function renderFactCheck(kit) {
+  if (kit.fact_check === 'pending') {
+    return `<section role="status" class="rounded-2xl bg-stone-200/70 p-4 text-sm font-medium flex items-center gap-3"><span class="flex gap-1 text-flame"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>Fact-checking every claim against the sources. Hold off posting until this finishes.</section>`;
+  }
+  if (kit.fact_check === 'flagged') {
+    const items = kit.unsupported_claims.map((c) => `<li>${esc(c)}</li>`).join('');
+    return `<section class="rounded-2xl bg-yellow-100 border border-yellow-400 p-5" role="alert">
+      <h2 class="font-display font-bold text-lg">Check before posting</h2>
+      <p class="text-sm mt-1">These claims aren't supported by the source articles:</p>
+      <ul class="list-disc pl-5 mt-2 text-sm space-y-1">${items}</ul>
+    </section>`;
+  }
+  if (kit.fact_check === 'unavailable') {
+    return `<section class="rounded-2xl bg-stone-200 p-4 text-sm font-medium">The fact-check couldn't run this time. Compare the copy with the sources before posting.</section>`;
+  }
+  return `<section class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm font-medium text-emerald-900">AI fact-check found no unsupported claims. It only sees the source headlines and summaries, so give it a final read.</section>`;
+}
+
+function itemToText(item) {
+  return [item.on_screen_text && `On screen: ${item.on_screen_text}`, item.text].filter(Boolean).join('\n');
+}
+
+function renderCover() {
+  const cover = state.cover;
+  if (!cover || cover.loading) {
+    return `<div role="status" aria-label="Generating cover" class="aspect-square rounded-2xl bg-stone-200 animate-pulse grid place-items-center text-sm font-medium text-stone-500">Generating cover...</div>`;
+  }
+  const safe = /^(https?:\/\/|data:image\/|\/media\/)/i.test(cover.image_url || '');
+  return `<figure class="rounded-2xl bg-white border border-stone-200 p-3">
+    ${safe ? `<img src="${esc(cover.image_url)}" alt="Cover image" class="w-full rounded-xl">` : ''}
+    ${cover.placeholder ? `<figcaption class="mt-2 text-xs text-stone-500">Placeholder cover: Muse Image isn't available right now.</figcaption>` : ''}
+    <div class="mt-3 flex flex-wrap gap-2">
+      ${safe ? `<a href="${esc(cover.image_url)}" download="trendcraft-cover" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-ink text-white px-3 py-1.5 text-xs font-semibold">Download</a>` : ''}
+      <button data-action="cover" class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold hover:border-ink">Regenerate</button>
+      ${copyBtn(state.kit.cover_image_prompt, 'Copy prompt')}
+    </div>
+  </figure>`;
+}
+
+function renderReel() {
+  const kit = state.kit;
+  if (kit.format !== 'reel') return '';
+  if (kit.reel_status === 'rendering') {
+    const scenes = kit.artifacts.filter((a) => a.kind === 'scene').map((a) => `<img src="${esc(a.url)}" alt="" class="piece h-20 w-[46px] rounded-md object-cover">`).join('');
+    return card('Reel studio', `<div role="status">
+      <p id="reel-stage" class="text-sm font-semibold">${esc(kit.reel_stage)}</p>
+      <div class="mt-2 h-2.5 rounded-full bg-stone-200 overflow-hidden"><div class="h-full rounded-full bg-flame transition-all duration-700" style="width:${Number(kit.reel_progress) || 0}%"></div></div>
+      ${scenes ? `<div class="mt-3 flex flex-wrap gap-1.5">${scenes}</div>` : ''}
+      <p class="mt-3 text-xs text-stone-500">Keep working if you like. It saves to your library when it's done.</p>
+    </div>`);
+  }
+  if (kit.reel_status === 'ready') {
+    return card('Your reel', `<video src="${esc(kit.reel_url)}" controls playsinline preload="metadata" class="w-full rounded-xl bg-ink"></video>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <a href="${esc(kit.reel_url)}" download="trendcraft-reel.mp4" class="rounded-lg bg-ink text-white px-3 py-1.5 text-xs font-semibold">Download MP4</a>
+        <button data-action="reel" class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold hover:border-ink">Remake</button>
+      </div>
+      <p class="mt-2 text-xs text-stone-500">Silent video: add your voice or a trending sound in your editor. The voiceover script and captions are in your files.</p>`);
+  }
+  return card('Reel studio', `${kit.reel_status === 'failed' ? `<p class="mb-2 text-sm font-medium text-flame-dark">${esc(kit.reel_stage)}</p>` : ''}
+    <p class="text-sm text-stone-600">Turn this script into a vertical video with a new AI scene for each beat, smart camera moves and animated captions.</p>
+    <button data-action="reel" class="mt-3 w-full rounded-xl bg-flame text-white font-semibold px-4 py-2.5 hover:bg-flame-dark transition">${kit.reel_status === 'failed' ? 'Try again' : 'Create reel'}</button>`);
+}
+
+function renderArtifacts() {
+  const kit = state.kit;
+  const files = kit.artifacts.filter((a) => a.kind !== 'scene');
+  const sceneCount = kit.artifacts.length - files.length;
+  const links = files.map((a) => `<li><a href="${esc(a.url)}" download class="underline decoration-stone-300 hover:decoration-ink">${esc(a.name)}</a></li>`).join('');
+  return card('Saved files', `<ul class="text-sm space-y-1">
+      <li class="text-stone-600">kit.md (all your copy, in the download)</li>
+      ${links}
+      ${sceneCount ? `<li class="text-stone-600">${sceneCount} scene images (in the download)</li>` : ''}
+    </ul>
+    <a href="/api/library/${esc(kit.id)}/bundle" class="mt-3 inline-block rounded-lg bg-ink text-white px-3 py-1.5 text-xs font-semibold">Download everything (.zip)</a>`);
+}
+
+function statusSelect(kit) {
+  const options = STATUSES.map((st) => `<option value="${st.id}" ${kit.status === st.id ? 'selected' : ''}>${st.label}</option>`).join('');
+  return `<select data-status-for="${esc(kit.id)}" aria-label="Post status" class="rounded-lg border border-stone-300 px-2 py-1.5 text-sm font-semibold ${STATUS_STYLE[kit.status]}">${options}</select>`;
+}
+
+function renderLibrary() {
+  const lib = state.library;
+  const counts = { all: lib.items.length };
+  STATUSES.forEach((st) => { counts[st.id] = lib.items.filter((k) => k.status === st.id).length; });
+  const pills = [{ id: 'all', label: 'All' }, ...STATUSES].map((f) => {
+    const on = lib.filter === f.id;
+    return `<button data-filter="${f.id}" aria-pressed="${on}" class="rounded-full border px-3.5 py-1.5 text-sm font-semibold ${on ? 'bg-ink border-ink text-white' : 'bg-white border-stone-300 hover:border-ink'}">${f.label} <span class="opacity-60">${counts[f.id]}</span></button>`;
+  }).join('');
+  return `<div class="flex flex-wrap items-end justify-between gap-3 mt-2">
+      <div>
+        <h1 class="font-display font-extrabold text-3xl sm:text-4xl tracking-tight">Your content library</h1>
+        <p class="text-stone-600 mt-1 text-sm">Every kit you make is saved here, with its files.</p>
+      </div>
+      <input id="library-search" value="${esc(lib.q)}" placeholder="Search your content" aria-label="Search your content" class="w-full sm:w-64 rounded-xl border border-stone-300 bg-white px-4 py-2.5 outline-none focus:border-ink">
+    </div>
+    ${lib.failed ? `<div class="mt-4">${errorBlock("Couldn't load your library.", 'load-library')}</div>` : ''}
+    <div class="mt-4 flex flex-wrap gap-2">${pills}</div>
+    <div id="library-grid" class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${renderLibraryGrid()}</div>`;
+}
+
+function renderLibraryGrid() {
+  const lib = state.library;
+  if (lib.loading) {
+    return Array.from({ length: 3 }, () => '<div class="h-64 rounded-2xl shine"></div>').join('');
+  }
+  const q = lib.q.trim().toLowerCase();
+  const items = lib.items.filter((k) => (lib.filter === 'all' || k.status === lib.filter)
+    && (!q || JSON.stringify([k.angle_title, k.niche, k.hooks, k.captions, k.hashtags]).toLowerCase().includes(q)));
+  if (!items.length) {
+    const none = lib.items.length === 0;
+    return `<div class="sm:col-span-2 lg:col-span-3 rounded-2xl border border-dashed border-stone-400 p-10 text-center">
+      <p class="font-display font-bold text-xl">${none ? 'Nothing saved yet' : 'No matches'}</p>
+      <p class="text-sm text-stone-600 mt-1">${none ? 'Build your first kit and it will appear here.' : 'Try another filter or search.'}</p>
+      ${none ? '<button data-view="create" class="mt-4 rounded-xl bg-ink text-white font-semibold px-5 py-2.5">Create a kit</button>' : ''}
+    </div>`;
+  }
+  return items.map((k) => {
+    const label = FORMATS.find((f) => f.id === k.format)?.label || k.format;
+    const date = new Date(k.created_at * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    return `<article class="rounded-2xl bg-white border border-stone-200 overflow-hidden flex flex-col">
+      <button data-open-kit="${esc(k.id)}" class="block text-left" aria-label="Open ${esc(k.angle_title)}">
+        ${k.cover_url ? `<img src="${esc(k.cover_url)}" alt="" loading="lazy" class="h-40 w-full object-cover">` : '<div class="h-40 bg-gradient-to-br from-flame to-amber-400"></div>'}
+      </button>
+      <div class="p-4 flex flex-1 flex-col">
+        <p class="text-xs font-semibold text-stone-500">${esc(label)} · ${esc(date)}${k.niche ? ` · ${esc(k.niche)}` : ''}${k.reel_status === 'ready' ? ' · Reel ready' : ''}</p>
+        <button data-open-kit="${esc(k.id)}" class="mt-1 flex-1 text-left font-display font-bold text-lg leading-snug hover:text-flame-dark">${esc(k.angle_title)}</button>
+        <div class="mt-3 flex items-center justify-between gap-2">${statusSelect(k)}
+          ${k.fact_check === 'flagged' ? '<span class="rounded-full bg-yellow-200 px-2.5 py-1 text-xs font-semibold">Check claims</span>' : ''}
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function renderKit() {
+  const kit = state.kit;
+  const hooks = kit.hooks.map((h) => `<li class="flex items-start justify-between gap-3 rounded-xl bg-paper p-3">
+    <span class="font-medium prewrap">${esc(h)}</span>${copyBtn(h)}</li>`).join('');
+  const tabs = CAPTION_TABS.map((t) => {
+    const on = state.captionTab === t.id;
+    return `<button role="tab" aria-selected="${on}" data-caption="${t.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold ${on ? 'bg-ink text-white' : 'bg-paper hover:bg-stone-200'}">${t.label}</button>`;
+  }).join('');
+  const caption = kit.captions[state.captionTab];
+  const items = kit.script_or_slides.map((item) => `<li class="rounded-xl bg-paper p-3">
+    <div class="flex items-start justify-between gap-3">
+      <h3 class="text-sm font-bold">${esc(item.label)}</h3>${copyBtn(itemToText(item))}
+    </div>
+    ${item.on_screen_text ? `<p class="mt-1 text-sm font-semibold text-flame-dark prewrap">${esc(item.on_screen_text)}</p>` : ''}
+    <p class="mt-1 text-sm prewrap">${esc(item.text)}</p>
+  </li>`).join('');
+  const allItems = kit.script_or_slides.map((i) => `${i.label}\n${itemToText(i)}`).join('\n\n');
+  const hashtags = kit.hashtags.map((t) => `<li class="rounded-full bg-paper px-3 py-1 text-sm font-medium">${esc(t)}</li>`).join('');
+  const tips = kit.tips.map((t) => `<li>${esc(t)}</li>`).join('');
+  const sources = kit.sources.map((s) => `<li><a class="underline decoration-stone-300 hover:decoration-ink" href="${esc(safeUrl(s.url))}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>${s.source ? ` <span class="text-stone-500">· ${esc(s.source)}</span>` : ''}</li>`).join('');
+
+  return `<div class="flex items-start justify-between gap-3 mt-2 mb-5">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-flame-dark">${esc(FORMATS.find((f) => f.id === kit.format).label)} kit${kit.styled ? ' · style matched' : ''}</p>
+        <h1 class="font-display font-extrabold text-3xl tracking-tight leading-tight">${esc(state.angle.title)}</h1>
+      </div>
+      <div class="shrink-0 flex flex-wrap justify-end items-center gap-2">
+        ${statusSelect(kit)}
+        ${state.fromLibrary
+          ? '<button data-view="library" class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold hover:border-ink">Back to library</button>'
+          : '<button data-go="2" class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold hover:border-ink">Other angles</button>'}
+      </div>
+    </div>
+    <div class="grid lg:grid-cols-[320px,1fr] gap-4 items-start">
+      <div class="space-y-4 min-w-0">${renderCover()}${renderReel()}${renderArtifacts()}</div>
+      <div class="space-y-4 min-w-0">
+        ${renderFactCheck(kit)}
+        ${card('Hook options', `<ul class="space-y-2">${hooks}</ul>`)}
+        ${card('Caption', `<div role="tablist" class="flex flex-wrap gap-1.5 mb-3">${tabs}</div><p class="text-sm prewrap">${esc(caption)}</p>`, copyBtn(caption))}
+        ${card(CONTENT_TITLES[kit.format], `<ol class="space-y-2">${items}</ol>`, copyBtn(allItems, 'Copy all'))}
+        ${card('Hashtags', `<ul class="flex flex-wrap gap-1.5">${hashtags}</ul>`, copyBtn(kit.hashtags.join(' '), 'Copy all'))}
+        ${card('Posting tips', `<ul class="list-disc pl-5 text-sm space-y-1">${tips}</ul>`)}
+        ${card('Sources', `<ul class="text-sm space-y-2">${sources}</ul>`)}
+      </div>
+    </div>`;
+}
+
+function render() {
+  renderTabs();
+  renderStepper();
+  renderBanner();
+  let html;
+  if (state.view === 'library') html = renderLibrary();
+  else if (state.loading?.kind === 'angles') html = renderNewsroom();
+  else if (state.loading?.kind === 'kit') html = renderWritersRoom();
+  else if (state.step === 1) html = renderNiche();
+  else if (state.step === 2) html = renderAngles();
+  else html = renderKit();
+  $('view').innerHTML = html;
+}
+
+function goTo(step) {
+  state.run += 1; // ignore any response still in flight
+  state.fromLibrary = false;
+  state.loading = null;
+  state.error = null;
+  state.step = step;
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+async function findAngles() {
+  const custom = state.custom.trim();
+  if (!state.niche && !custom) {
+    toast('Pick a niche or type a topic first.');
+    return;
+  }
+  const run = ++state.run;
+  state.error = null;
+  state.origin = null;
+  state.step = 2;
+  state.loading = { kind: 'angles', headlines: null, messages: ANGLE_MESSAGES, blocks: 4, tick: 0 };
+  render();
+  try {
+    const query = state.niche ? { niche: state.niche } : { custom_query: custom };
+    const news = await postJson('/api/news', query);
+    if (run !== state.run) return;
+    state.loading.headlines = news.headlines;
+    state.loading.origin = news.origin;
+    render();
+    const data = await postJson('/api/angles', query);
+    if (run !== state.run) return;
+    Object.assign(state, {
+      angles: data.angles, origin: data.origin, nicheLabel: data.niche, articleCount: data.article_count, loading: null,
+    });
+    render();
+  } catch (err) {
+    if (run !== state.run) return;
+    Object.assign(state, { step: 1, loading: null, error: err.message });
+    toast(err.message);
+    render();
+  }
+}
+
+async function buildKit(angle) {
+  const run = ++state.run;
+  state.angle = angle;
+  state.error = null;
+  state.loading = { kind: 'kit', messages: KIT_MESSAGES, blocks: 4, tick: 0 };
+  state.step = 3;
+  render();
+  window.scrollTo({ top: 0 });
+  try {
+    const { title, why_now, articles } = angle;
+    const kit = await postJson('/api/kit', {
+      angle: { title, why_now, articles }, format: state.format, style: state.style, niche: state.nicheLabel,
+    });
+    if (run !== state.run) return;
+    Object.assign(state, { kit, kitStyled: Boolean(state.style), captionTab: 'informative', loading: null });
+    state.fromLibrary = false;
+    loadCover();
+    runFactCheck(kit);
+  } catch (err) {
+    if (run !== state.run) return;
+    Object.assign(state, { step: 2, loading: null, error: err.message });
+    toast(err.message);
+    render();
+  }
+}
+
+function clearStyle() {
+  state.styleRun += 1;
+  state.styleThumbs.forEach((url) => URL.revokeObjectURL(url));
+  Object.assign(state, { style: null, styleThumbs: [], styleLoading: false });
+}
+
+async function uploadStyle(files) {
+  if (!files.length) return;
+  const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+  let problem = null;
+  if (files.length > 3) problem = 'Upload at most 3 screenshots.';
+  else if (files.some((f) => !allowed.includes(f.type))) problem = 'Screenshots must be PNG, JPEG or WebP images.';
+  else if (files.some((f) => f.size > 5 * 1024 * 1024)) problem = 'Each screenshot must be 5 MB or smaller.';
+  if (problem) {
+    toast(problem);
+    render();
+    return;
+  }
+  clearStyle();
+  const run = state.styleRun;
+  state.styleThumbs = files.map((f) => URL.createObjectURL(f));
+  state.styleLoading = true;
+  render();
+  const form = new FormData();
+  files.forEach((f) => form.append('images', f));
+  try {
+    const style = await api('/api/style', { method: 'POST', body: form });
+    if (run !== state.styleRun) return;
+    Object.assign(state, { style, styleLoading: false });
+  } catch (err) {
+    if (run !== state.styleRun) return;
+    clearStyle();
+    toast(err.message);
+  }
+  if (state.step === 2 && !state.loading) render();
+}
+
+async function loadCover() {
+  const kit = state.kit;
+  state.cover = { loading: true };
+  render();
+  let cover;
+  try {
+    cover = await postJson('/api/cover', {
+      cover_image_prompt: kit.cover_image_prompt, hook: kit.hooks[0], palette: state.style?.palette, kit_id: kit.id,
+    });
+  } catch (err) {
+    toast(err.message);
+    cover = { image_url: '', placeholder: false };
+  }
+  if (state.kit !== kit) return;
+  state.cover = cover;
+  await refreshKit(kit);
+  if (state.step === 3 && state.view === 'create') render();
+}
+
+// Merge the saved record into the open kit so its file list stays current.
+async function refreshKit(kit) {
+  try {
+    const fresh = await api(`/api/library/${kit.id}`);
+    Object.assign(kit, fresh);
+  } catch { /* the kit on screen is still usable */ }
+}
+
+async function runFactCheck(kit) {
+  try {
+    Object.assign(kit, await postJson(`/api/library/${kit.id}/factcheck`, {}));
+  } catch {
+    kit.fact_check = 'unavailable';
+  }
+  if (state.kit === kit && state.step === 3 && state.view === 'create') render();
+}
+
+async function startReel() {
+  const kit = state.kit;
+  try {
+    Object.assign(kit, await postJson(`/api/library/${kit.id}/reel`, {}));
+    render();
+    watchReel(kit);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function watchReel(kit) {
+  clearInterval(state.reelTimer);
+  state.reelTimer = setInterval(async () => {
+    if (state.kit !== kit) {
+      clearInterval(state.reelTimer);
+      return;
+    }
+    const before = `${kit.reel_stage}|${kit.reel_status}|${kit.artifacts.length}`;
+    await refreshKit(kit);
+    if (kit.reel_status !== 'rendering') clearInterval(state.reelTimer);
+    const changed = before !== `${kit.reel_stage}|${kit.reel_status}|${kit.artifacts.length}`;
+    if (changed && state.step === 3 && state.view === 'create') render();
+  }, 1500);
+}
+
+async function loadLibrary() {
+  Object.assign(state.library, { loading: true, failed: false });
+  if (state.view === 'library') render();
+  try {
+    state.library.items = (await api('/api/library')).kits;
+  } catch (err) {
+    state.library.failed = true;
+    toast(err.message);
+  }
+  state.library.loading = false;
+  if (state.view === 'library') render();
+}
+
+async function setStatus(kitId, status) {
+  try {
+    const fresh = await api(`/api/library/${kitId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+    });
+    const item = state.library.items.find((k) => k.id === kitId);
+    if (item) item.status = fresh.status;
+    if (state.kit?.id === kitId) state.kit.status = fresh.status;
+    toast(`Marked as ${STATUSES.find((st) => st.id === status).label.toLowerCase()}`, 'ok');
+  } catch (err) {
+    toast(err.message);
+  }
+  render();
+}
+
+async function openKit(kitId) {
+  closeChatOnMobile();
+  try {
+    const kit = await api(`/api/library/${kitId}`);
+    state.run += 1;
+    Object.assign(state, {
+      view: 'create', fromLibrary: true, step: 3, kit, loading: null, error: null, captionTab: 'informative',
+      angle: { title: kit.angle_title },
+      cover: kit.cover_url ? { image_url: kit.cover_url, placeholder: kit.cover_placeholder } : null,
+    });
+    render();
+    window.scrollTo({ top: 0 });
+    if (!kit.cover_url) loadCover();
+    if (kit.fact_check === 'pending') runFactCheck(kit);
+    if (kit.reel_status === 'rendering') watchReel(kit);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// ---------- Chat
+function closeChatOnMobile() {
+  if (window.innerWidth < 640) setChatOpen(false);
+}
+
+function setChatOpen(open) {
+  state.chat.open = open;
+  $('chat-panel').classList.toggle('hidden', !open);
+  $('chat-panel').classList.toggle('flex', open);
+  $('chat-toggle').classList.toggle('hidden', open);
+  if (open) {
+    renderChat();
+    $('chat-input').focus();
+  }
+}
+
+function renderChat() {
+  const { messages, busy, recording } = state.chat;
+  const bubbles = messages.map((m) => {
+    if (m.role === 'user') return `<div class="flex justify-end"><p class="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-white px-3.5 py-2 text-sm prewrap">${esc(m.content)}</p></div>`;
+    const cites = (m.kits || []).map((k) => `<button data-open-kit="${esc(k.id)}" class="block w-full truncate text-left rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-semibold hover:border-ink">${esc(k.angle_title)}</button>`).join('');
+    return `<div class="max-w-[90%]"><p class="rounded-2xl rounded-bl-md bg-paper px-3.5 py-2 text-sm prewrap">${esc(m.content)}</p>${cites ? `<div class="mt-1.5 space-y-1">${cites}</div>` : ''}</div>`;
+  }).join('');
+  const intro = messages.length ? '' : `<p class="text-sm text-stone-600">Ask about anything you've saved: what's still unposted, your best hooks, or what you've covered on a topic.</p>
+    <div class="space-y-1.5">${CHAT_SUGGESTIONS.map((q) => `<button data-suggest="${esc(q)}" class="block w-full text-left rounded-xl border border-stone-300 px-3 py-2 text-sm font-medium hover:border-ink">${esc(q)}</button>`).join('')}</div>`;
+  const typing = busy ? '<div class="inline-flex gap-1 rounded-2xl bg-paper px-3.5 py-3 text-stone-500" role="status" aria-label="Thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>' : '';
+  const box = $('chat-messages');
+  box.innerHTML = intro + bubbles + typing;
+  box.scrollTop = box.scrollHeight;
+  const mic = $('chat-mic');
+  mic.textContent = recording ? 'Stop' : 'Voice';
+  mic.className = `shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold ${recording ? 'bg-flame border-flame text-white' : 'border-stone-300 hover:border-ink'}`;
+}
+
+async function sendChat(text) {
+  const message = text.trim();
+  const { chat } = state;
+  if (!message || chat.busy) return;
+  const history = chat.messages.slice(-10).map(({ role, content }) => ({ role, content: content.slice(0, 4000) }));
+  chat.messages.push({ role: 'user', content: message });
+  chat.busy = true;
+  renderChat();
+  try {
+    const data = await postJson('/api/chat', { message, history });
+    if (!state.library.items.length || data.kit_ids.some((id) => !state.library.items.find((k) => k.id === id))) {
+      state.library.items = (await api('/api/library')).kits;
+    }
+    const kits = data.kit_ids.map((id) => state.library.items.find((k) => k.id === id)).filter(Boolean);
+    chat.messages.push({ role: 'assistant', content: data.answer, kits });
+  } catch (err) {
+    chat.messages.push({ role: 'assistant', content: err.message });
+  }
+  chat.busy = false;
+  renderChat();
+}
+
+function encodeWav(samples, rate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const text = (at, value) => [...value].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+  text(0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true); text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true); text(36, 'data'); view.setUint32(40, samples.length * 2, true);
+  samples.forEach((sample, i) => {
+    const clipped = Math.max(-1, Math.min(1, sample));
+    view.setInt16(44 + i * 2, clipped < 0 ? clipped * 32768 : clipped * 32767, true);
+  });
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+const WAV_RATE = 16000;
+let recorder = null;
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const context = new AudioContext({ sampleRate: WAV_RATE });
+    const source = context.createMediaStreamSource(stream);
+    const node = context.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    node.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+    source.connect(node);
+    node.connect(context.destination);
+    recorder = { stream, context, node, chunks };
+    state.chat.recording = true;
+    renderChat();
+  } catch {
+    toast("Couldn't use the microphone. You can type your question instead.");
+  }
+}
+
+async function stopRecording() {
+  const { stream, context, node, chunks } = recorder;
+  recorder = null;
+  node.disconnect();
+  stream.getTracks().forEach((track) => track.stop());
+  const rate = context.sampleRate;
+  await context.close();
+  state.chat.recording = false;
+  const samples = new Float32Array(chunks.reduce((total, c) => total + c.length, 0));
+  let offset = 0;
+  chunks.forEach((c) => { samples.set(c, offset); offset += c.length; });
+  $('chat-input').placeholder = 'Listening back...';
+  state.chat.busy = true;
+  renderChat();
+  try {
+    const form = new FormData();
+    form.append('audio', encodeWav(samples, rate), 'question.wav');
+    const { text } = await api('/api/chat/transcribe', { method: 'POST', body: form });
+    state.chat.busy = false;
+    if (text) sendChat(text);
+    else toast("Didn't catch that. Please try again.");
+  } catch (err) {
+    state.chat.busy = false;
+    toast(err.message);
+  }
+  $('chat-input').placeholder = 'Ask about your posts...';
+  renderChat();
+}
+
+document.addEventListener('click', async (event) => {
+  const el = event.target.closest('button');
+  if (!el) return;
+  const d = el.dataset;
+  if (el.id === 'logo') {
+    state.niche = null;
+    state.custom = '';
+    state.view = 'create';
+    state.fromLibrary = false;
+    goTo(1);
+  } else if (el.id === 'chat-toggle') {
+    setChatOpen(true);
+  } else if (el.id === 'chat-close') {
+    setChatOpen(false);
+  } else if (el.id === 'chat-mic') {
+    if (state.chat.recording) stopRecording();
+    else if (!state.chat.busy) startRecording();
+  } else if (d.suggest) {
+    sendChat(d.suggest);
+  } else if (d.openKit) {
+    openKit(d.openKit);
+  } else if (d.view) {
+    if (d.view === 'library') loadLibrary();
+    if (d.view === 'create' && (state.fromLibrary || state.view === 'library') && state.fromLibrary) {
+      Object.assign(state, { fromLibrary: false, step: 1, kit: null });
+    }
+    state.view = d.view;
+    render();
+    window.scrollTo({ top: 0 });
+  } else if (d.filter) {
+    state.library.filter = d.filter;
+    render();
+  } else if (d.copy !== undefined) {
+    try {
+      await navigator.clipboard.writeText(d.copy);
+      toast('Copied', 'ok');
+    } catch {
+      toast("Couldn't copy. Select the text instead.");
+    }
+  } else if (d.go) {
+    goTo(Number(d.go));
+  } else if (d.niche) {
+    state.niche = state.niche === d.niche ? null : d.niche;
+    state.custom = '';
+    state.error = null;
+    render();
+  } else if (d.format) {
+    state.format = d.format;
+    render();
+  } else if (d.angle) {
+    buildKit(state.angles[Number(d.angle)]);
+  } else if (d.caption) {
+    state.captionTab = d.caption;
+    render();
+  } else if (d.action === 'find') {
+    findAngles();
+  } else if (d.action === 'retry-kit') {
+    buildKit(state.angle);
+  } else if (d.action === 'reel') {
+    startReel();
+  } else if (d.action === 'load-library') {
+    loadLibrary();
+  } else if (d.action === 'load-niches') {
+    loadNiches();
+  } else if (d.action === 'cover') {
+    loadCover();
+  } else if (d.action === 'clear-style') {
+    clearStyle();
+    render();
+  }
+});
+
+document.addEventListener('input', (event) => {
+  if (event.target.id === 'library-search') {
+    state.library.q = event.target.value;
+    $('library-grid').innerHTML = renderLibraryGrid();
+    return;
+  }
+  if (event.target.id !== 'custom') return;
+  state.custom = event.target.value;
+  if (state.niche) {
+    state.niche = null;
+    document.querySelectorAll('[data-niche]').forEach((chip) => {
+      chip.setAttribute('aria-pressed', 'false');
+      chip.className = 'rounded-full border px-4 py-2 text-sm font-semibold transition bg-white border-stone-300 hover:border-ink';
+    });
+  }
+});
+
+document.addEventListener('submit', (event) => {
+  if (event.target.id !== 'chat-form') return;
+  event.preventDefault();
+  const input = $('chat-input');
+  sendChat(input.value);
+  input.value = '';
+});
+
+document.addEventListener('change', (event) => {
+  if (event.target.dataset.statusFor) setStatus(event.target.dataset.statusFor, event.target.value);
+  if (event.target.id === 'style-input') uploadStyle([...event.target.files]);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && event.target.id === 'custom') findAngles();
+});
+
+setInterval(() => {
+  const el = $('loading-msg');
+  if (!el || !state.loading) return;
+  const { messages } = state.loading;
+  state.loading.ticks = (state.loading.ticks || 0) + 1;
+  state.loading.tick = Math.min(state.loading.tick + 1, messages.length - 1);
+  el.textContent = messages[state.loading.tick];
+  document.querySelectorAll('[data-stage]').forEach((row) => {
+    const active = Number(row.dataset.stage) === Math.min(Math.floor(state.loading.ticks / 2), 4);
+    row.className = `flex items-center gap-2.5 text-sm ${active ? 'font-semibold text-ink' : 'text-stone-400'}`;
+    row.firstElementChild.className = `h-2 w-2 rounded-full ${active ? 'bg-flame' : 'bg-stone-300'}`;
+  });
+  const tip = $('loading-tip');
+  if (tip && state.loading.ticks % 2 === 0) tip.textContent = TIPS[(TIPS.indexOf(tip.textContent) + 1) % TIPS.length];
+}, 5000);
+
+async function loadNiches() {
+  state.nichesFailed = false;
+  if (state.step === 1) render();
+  try {
+    const [{ niches }, health] = await Promise.all([api('/api/niches'), api('/api/health')]);
+    Object.assign(state, { niches, health });
+  } catch (err) {
+    state.nichesFailed = true;
+    toast(err.message);
+  }
+  if (state.step === 1) render();
+}
+
+loadNiches();
+</script>
+</body>
+</html>
